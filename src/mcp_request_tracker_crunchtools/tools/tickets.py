@@ -1,15 +1,10 @@
 """MCP tools for Request Tracker ticket operations."""
 
-from typing import TYPE_CHECKING
-
 from mcp.server.fastmcp import FastMCP
 
-from ..client import RTClient
-from ..config import get_config
-from ..errors import RTApiError
-
-if TYPE_CHECKING:
-    pass
+from mcp_request_tracker_crunchtools.client import RTClient
+from mcp_request_tracker_crunchtools.config import get_config
+from mcp_request_tracker_crunchtools.errors import RTApiError
 
 # Global RT client instance
 _rt_client: RTClient | None = None
@@ -246,7 +241,8 @@ def register_tools(mcp: FastMCP) -> None:
             result = await client.add_time_worked(ticket_id, minutes)
             ticket = await client.get_ticket(ticket_id)
             total = ticket.get("TimeWorked", "0")
-            return f"Added {minutes} minutes to ticket #{ticket_id}. New total: {total} minutes.\n{result}"
+            msg = f"Added {minutes} minutes to ticket #{ticket_id}. New total: {total} minutes."
+            return f"{msg}\n{result}"
         except RTApiError as e:
             return f"Error adding time worked: {e}"
 
@@ -430,11 +426,7 @@ def register_tools(mcp: FastMCP) -> None:
         """
         client = get_rt_client()
         try:
-            if queue:
-                query = f"Status = 'new' AND Queue = '{queue}'"
-            else:
-                query = "Status = 'new'"
-
+            query = f"Status = 'new' AND Queue = '{queue}'" if queue else "Status = 'new'"
             results = await client.search_tickets(query, "-Created")
 
             if not results:

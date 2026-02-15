@@ -11,34 +11,34 @@ class TestConfig:
 
     def test_config_requires_url(self) -> None:
         """Test that RT_URL is required."""
+        from mcp_request_tracker_crunchtools.config import Config
         from mcp_request_tracker_crunchtools.errors import ConfigurationError
 
-        with patch.dict(os.environ, {}, clear=True):
-            with pytest.raises(ConfigurationError, match="RT_URL"):
-                from mcp_request_tracker_crunchtools.config import Config
-
-                Config()
+        with patch.dict(os.environ, {}, clear=True), pytest.raises(
+            ConfigurationError, match="RT_URL"
+        ):
+            Config()
 
     def test_config_requires_user(self) -> None:
         """Test that RT_USER is required."""
+        from mcp_request_tracker_crunchtools.config import Config
         from mcp_request_tracker_crunchtools.errors import ConfigurationError
 
-        with patch.dict(os.environ, {"RT_URL": "https://rt.example.com"}, clear=True):
-            with pytest.raises(ConfigurationError, match="RT_USER"):
-                from mcp_request_tracker_crunchtools.config import Config
-
-                Config()
+        with patch.dict(
+            os.environ, {"RT_URL": "https://rt.example.com"}, clear=True
+        ), pytest.raises(ConfigurationError, match="RT_USER"):
+            Config()
 
     def test_config_requires_pass(self) -> None:
         """Test that RT_PASS is required."""
+        from mcp_request_tracker_crunchtools.config import Config
         from mcp_request_tracker_crunchtools.errors import ConfigurationError
 
         env = {"RT_URL": "https://rt.example.com", "RT_USER": "test"}
-        with patch.dict(os.environ, env, clear=True):
-            with pytest.raises(ConfigurationError, match="RT_PASS"):
-                from mcp_request_tracker_crunchtools.config import Config
-
-                Config()
+        with patch.dict(os.environ, env, clear=True), pytest.raises(
+            ConfigurationError, match="RT_PASS"
+        ):
+            Config()
 
     def test_config_valid(self) -> None:
         """Test valid configuration."""

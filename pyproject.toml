@@ -51,18 +51,16 @@ select = ["E", "F", "I", "N", "W", "UP", "S", "B", "C4", "DTZ", "T10", "ISC", "P
 ignore = [
     "S101",     # assert allowed in tests
     "TRY003",   # long exception messages ok
-    "PLR0913",  # many arguments ok for tools
+    "PLR0913",  # many arguments ok for MCP tools
     "PLR2004",  # magic numbers ok (HTTP status codes)
     "PLW0603",  # global statement ok for singletons
-    "PIE790",   # pass in empty classes ok
-    "PLC0415",  # imports in tests ok
-    "S105",     # hardcoded passwords in tests ok
-    "TID252",   # relative imports in package ok
-    "RUF022",   # __all__ sorted by category, not alphabetically
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S105", "PLC0415", "PLR2004"]
+# MCP tool registration is intentionally one large function with many statements
+# Return in try blocks is cleaner for simple MCP tool patterns
+"src/mcp_request_tracker_crunchtools/tools/tickets.py" = ["PLR0915", "TRY300"]
 
 [tool.mypy]
 python_version = "3.10"

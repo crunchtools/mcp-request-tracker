@@ -29,25 +29,17 @@ class RTError(Exception):
 class ConfigurationError(RTError):
     """Raised when configuration is invalid or missing."""
 
-    pass
-
 
 class AuthenticationError(RTError):
     """Raised when authentication fails."""
-
-    pass
 
 
 class TicketNotFoundError(RTError):
     """Raised when a ticket is not found."""
 
-    pass
-
 
 class PermissionError(RTError):
     """Raised when the user lacks permission for an operation."""
-
-    pass
 
 
 class RTApiError(RTError):

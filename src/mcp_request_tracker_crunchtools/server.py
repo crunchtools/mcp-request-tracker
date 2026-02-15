@@ -5,8 +5,8 @@ All credentials are handled securely via SecretStr.
 """
 
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 from mcp.server.fastmcp import FastMCP
 
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(mcp: FastMCP) -> AsyncIterator[None]:
+async def lifespan(_mcp: FastMCP) -> AsyncIterator[None]:
     """Lifecycle manager for the MCP server."""
     logger.info("Starting MCP Request Tracker server")
     yield

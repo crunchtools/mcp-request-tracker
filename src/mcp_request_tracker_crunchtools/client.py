@@ -48,7 +48,6 @@ class RTClient:
 
     async def _request(
         self,
-        method: str,
         endpoint: str,
         data: dict[str, Any] | None = None,
         params: dict[str, str] | None = None,
@@ -56,7 +55,6 @@ class RTClient:
         """Make authenticated request to RT API.
 
         Args:
-            method: HTTP method (unused, RT uses POST for everything).
             endpoint: API endpoint path.
             data: Form data to send.
             params: Query parameters.
@@ -142,12 +140,12 @@ class RTClient:
     def _parse_search_results(self, text: str) -> list[dict[str, str]]:
         """Parse search results into list of tickets."""
         results: list[dict[str, str]] = []
-        for line in text.split("\n"):
-            line = line.strip()
-            if not line:
+        for raw_line in text.split("\n"):
+            stripped = raw_line.strip()
+            if not stripped:
                 continue
             # Format: "123: Subject here"
-            match = re.match(r"^(\d+): (.+)$", line)
+            match = re.match(r"^(\d+): (.+)$", stripped)
             if match:
                 results.append({
                     "id": match.group(1),
@@ -174,7 +172,7 @@ class RTClient:
             "query": query,
             "orderby": order_by,
         }
-        response = await self._request("GET", "search/ticket", params=params)
+        response = await self._request("search/ticket", params=params)
         status, message, body = self._parse_response(response)
 
         if status != 200:
@@ -194,7 +192,7 @@ class RTClient:
         Raises:
             RTApiError: On API errors.
         """
-        response = await self._request("GET", f"ticket/{ticket_id}/show")
+        response = await self._request(f"ticket/{ticket_id}/show")
         status, message, body = self._parse_response(response)
 
         if status != 200:
@@ -215,7 +213,7 @@ class RTClient:
             RTApiError: On API errors.
         """
         response = await self._request(
-            "GET", f"ticket/{ticket_id}/history", params={"format": "l"}
+            f"ticket/{ticket_id}/history", params={"format": "l"}
         )
         status, message, body = self._parse_response(response)
 
@@ -245,7 +243,7 @@ class RTClient:
         content = "\n".join(content_lines)
 
         response = await self._request(
-            "POST", f"ticket/{ticket_id}/edit", data={"content": content}
+            f"ticket/{ticket_id}/edit", data={"content": content}
         )
         status, message, body = self._parse_response(response)
 
@@ -291,7 +289,7 @@ class RTClient:
         formatted_text = self._format_multiline_text(text)
         content = f"id: {ticket_id}\nAction: correspond\nText: {formatted_text}"
         response = await self._request(
-            "POST", f"ticket/{ticket_id}/comment", data={"content": content}
+            f"ticket/{ticket_id}/comment", data={"content": content}
         )
         status, message, body = self._parse_response(response)
 
@@ -305,7 +303,7 @@ class RTClient:
         formatted_text = self._format_multiline_text(text)
         content = f"id: {ticket_id}\nAction: comment\nText: {formatted_text}"
         response = await self._request(
-            "POST", f"ticket/{ticket_id}/comment", data={"content": content}
+            f"ticket/{ticket_id}/comment", data={"content": content}
         )
         status, message, body = self._parse_response(response)
 
@@ -352,7 +350,7 @@ class RTClient:
 
         content = "\n".join(content_lines)
 
-        response = await self._request("POST", "ticket/new", data={"content": content})
+        response = await self._request("ticket/new", data={"content": content})
         status, message, body = self._parse_response(response)
 
         if status != 200:
