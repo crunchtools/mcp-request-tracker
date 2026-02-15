@@ -47,9 +47,9 @@ jobs:
 
       - name: Build container image
         run: |
-          podman build -t mcp-request-tracker:test .
+          docker build -t mcp-request-tracker:test .
 
       - name: Verify container
         run: |
           # Just verify it starts (will fail due to no credentials, but should start)
-          timeout 5 podman run --rm mcp-request-tracker:test || true
+          timeout 5 docker run --rm mcp-request-tracker:test || true

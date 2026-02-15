@@ -103,14 +103,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build container image
-        run: |
-          podman build -t mcp-request-tracker:scan .
-
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: "mcp-request-tracker:scan"
+          image-ref: "quay.io/crunchtools/mcp-request-tracker:latest"
           format: "sarif"
           output: "trivy-results.sarif"
           severity: "CRITICAL,HIGH"
