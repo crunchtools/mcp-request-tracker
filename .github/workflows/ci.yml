@@ -47,7 +47,7 @@ jobs:
 
       - name: Build container image
         run: |
-          docker build -t mcp-request-tracker:test .
+          docker build -f Containerfile -t mcp-request-tracker:test .
 
       - name: Verify container
         run: |
