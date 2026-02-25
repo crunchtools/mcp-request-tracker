@@ -1,6 +1,6 @@
 """MCP tools for Request Tracker ticket operations."""
 
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 from mcp_request_tracker_crunchtools.client import RTClient
 from mcp_request_tracker_crunchtools.config import get_config
