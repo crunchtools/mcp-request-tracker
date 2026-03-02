@@ -1,0 +1,38 @@
+# Gourmand Exceptions
+# Documented exceptions for files that legitimately trigger checks
+
+# Summary litter — CLAUDE.md is a standard Claude Code project instructions file
+[[exceptions]]
+check = "summary_litter"
+path = "CLAUDE.md"
+justification = "Claude Code project instructions for AI assistant orientation"
+
+# Primitive obsession — port 8000 is a standard default for HTTP servers
+[[exceptions]]
+check = "primitive_obsession"
+path = "src/mcp_request_tracker_crunchtools/__init__.py"
+justification = "Port 8000 is a standard default for HTTP servers"
+
+# Primitive obsession — HTTP status codes and timeout are standard API patterns
+[[exceptions]]
+check = "primitive_obsession"
+path = "src/mcp_request_tracker_crunchtools/client.py"
+justification = "HTTP status codes (200, 403, 500) and timeout (30s) are standard well-known constants"
+
+# Implicit state machine — ticket parsing uses simple regex matching, not state machines
+[[exceptions]]
+check = "implicit_state_machine"
+path = "src/mcp_request_tracker_crunchtools/client.py"
+justification = "Response and ticket parsing use simple regex matching patterns, not state machines"
+
+# Implicit state machine — optional parameter builders are not state machines
+[[exceptions]]
+check = "implicit_state_machine"
+path = "src/mcp_request_tracker_crunchtools/tools/tickets.py"
+justification = "Optional API parameter builders use simple if-guards, not state machines"
+
+# Primitive obsession — HTTP status code 200 and mock URL are standard test patterns
+[[exceptions]]
+check = "primitive_obsession"
+path = "tests/conftest.py"
+justification = "HTTP status code 200 and rt.example.com URL are standard test fixture patterns"

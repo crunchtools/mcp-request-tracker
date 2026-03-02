@@ -93,5 +93,8 @@ Thumbs.db
 pass
 tmp/
 
+# Gourmand cache
+.gourmand-cache/
+
 # MCP Registry auth tokens
 .mcpregistry_*

@@ -112,7 +112,6 @@ class TestClient:
             config = Config()
             client = RTClient(config)
 
-            # Test successful response parsing
             response = "RT/4.4.4 200 Ok\n\nid: 123\nSubject: Test"
             status, message, body = client._parse_response(response)
             assert status == 200

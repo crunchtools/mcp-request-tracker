@@ -50,10 +50,8 @@ class Config:
 
         self._url = url.rstrip("/")
         self._username = username
-        # Store password as SecretStr to prevent accidental logging
         self._password = SecretStr(password)
 
-        # Optional HTTP Basic Auth (if RT is behind basic auth)
         http_user = os.environ.get("RT_HTTP_USER")
         http_pass = os.environ.get("RT_HTTP_PASS")
         self._http_user = http_user
@@ -111,7 +109,6 @@ class Config:
         return f"Config(url={self._url!r}, user={self._username!r}, password=***)"
 
 
-# Global configuration instance - initialized on first import
 _config: Config | None = None
 
 

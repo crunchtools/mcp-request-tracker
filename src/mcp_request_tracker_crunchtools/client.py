@@ -68,7 +68,6 @@ class RTClient:
         client = await self._get_client()
         url = f"{self._config.api_base_url}/{endpoint}"
 
-        # RT REST 1.0 always needs login credentials in form data
         form_data = {
             "user": self._config.username,
             "pass": self._config.password,
@@ -76,10 +75,7 @@ class RTClient:
         if data:
             form_data.update(data)
 
-        # RT REST 1.0 uses POST for authentication even on "GET" operations
-        # The params become query string parameters
         if params:
-            # Build query string manually
             query_parts = [f"{k}={v}" for k, v in params.items()]
             if "?" in url:
                 url = url + "&" + "&".join(query_parts)
@@ -97,7 +93,6 @@ class RTClient:
         if not lines:
             return 500, "Empty response", ""
 
-        # First line is like "RT/4.4.4 200 Ok"
         first_line = lines[0]
         match = re.match(r"RT/[\d.]+ (\d+) (.+)", first_line)
         if match:
@@ -110,7 +105,7 @@ class RTClient:
 
     def _parse_ticket(self, text: str) -> dict[str, Any]:
         """Parse ticket show response into dictionary."""
-        result: dict[str, Any] = {}
+        fields: dict[str, Any] = {}
         current_key: str | None = None
         current_value: list[str] = []
 
@@ -118,24 +113,22 @@ class RTClient:
             if not line.strip():
                 continue
 
-            # Check for key: value pattern
-            match = re.match(r"^([A-Za-z][A-Za-z0-9_-]*):(.*)$", line)
-            if match:
-                # Save previous key if exists
-                if current_key:
-                    result[current_key] = "\n".join(current_value).strip()
+            field_match = re.match(r"^([A-Za-z][A-Za-z0-9_-]*):(.*)$", line)
+            match field_match:
+                case None if current_key and line.startswith(" "):
+                    current_value.append(line.strip())
+                case None:
+                    pass
+                case _:
+                    if current_key:
+                        fields[current_key] = "\n".join(current_value).strip()
+                    current_key = field_match.group(1)
+                    current_value = [field_match.group(2).strip()]
 
-                current_key = match.group(1)
-                current_value = [match.group(2).strip()]
-            elif current_key and line.startswith(" "):
-                # Continuation of previous value
-                current_value.append(line.strip())
-
-        # Save last key
         if current_key:
-            result[current_key] = "\n".join(current_value).strip()
+            fields[current_key] = "\n".join(current_value).strip()
 
-        return result
+        return fields
 
     def _parse_search_results(self, text: str) -> list[dict[str, str]]:
         """Parse search results into list of tickets."""
@@ -144,7 +137,6 @@ class RTClient:
             stripped = raw_line.strip()
             if not stripped:
                 continue
-            # Format: "123: Subject here"
             match = re.match(r"^(\d+): (.+)$", stripped)
             if match:
                 results.append({
@@ -235,7 +227,6 @@ class RTClient:
         Raises:
             RTApiError: On API errors.
         """
-        # Build content in RT format
         content_lines = []
         for key, value in fields.items():
             content_lines.append(f"{key}: {value}")
@@ -266,7 +257,6 @@ class RTClient:
 
     async def add_time_worked(self, ticket_id: int | str, minutes: int) -> str:
         """Add time to time worked on ticket (in minutes)."""
-        # Get current time worked
         ticket = await self.get_ticket(ticket_id)
         current = int(ticket.get("TimeWorked", "0") or "0")
         new_total = current + minutes
@@ -280,7 +270,6 @@ class RTClient:
         lines = text.split("\n")
         if len(lines) <= 1:
             return text
-        # First line stays as-is, subsequent lines get prefixed with a space
         formatted_lines = [lines[0]] + [" " + line for line in lines[1:]]
         return "\n".join(formatted_lines)
 
@@ -356,12 +345,10 @@ class RTClient:
         if status != 200:
             raise RTApiError(status, f"{message} - {body}")
 
-        # Parse ticket ID from response like "# Ticket 123 created."
         match = re.search(r"Ticket (\d+) created", body)
         if match:
             return match.group(1)
 
-        # Check for error patterns in the body
         if "Could not create ticket" in body or "No permission" in body:
             raise RTApiError(403, body.strip())
 

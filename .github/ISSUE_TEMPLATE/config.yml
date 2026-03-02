@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: RT REST API Documentation
+    url: https://docs.bestpractical.com/rt/latest/RT/REST.html
+    about: Check the RT REST API for endpoint behavior questions

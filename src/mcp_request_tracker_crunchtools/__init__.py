@@ -1,9 +1,36 @@
-"""MCP Request Tracker CrunchTools.
+"""Secure MCP server for Request Tracker (RT) ticket management."""
 
-A secure MCP server for Request Tracker ticket management.
-"""
+import argparse
 
-from .server import main
+from .server import mcp
 
-__version__ = "0.1.0"
-__all__ = ["__version__", "main"]
+__version__ = "0.3.0"
+__all__ = ["main", "mcp"]
+
+
+def main() -> None:
+    """Main entry point for the MCP server."""
+    parser = argparse.ArgumentParser(description="MCP server for Request Tracker")
+    parser.add_argument(
+        "--transport",
+        choices=["stdio", "sse", "streamable-http"],
+        default="stdio",
+        help="Transport protocol (default: stdio)",
+    )
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host to bind to for HTTP transports (default: 127.0.0.1)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Port to bind to for HTTP transports (default: 8000)",
+    )
+    args = parser.parse_args()
+
+    if args.transport == "stdio":
+        mcp.run()
+    else:
+        mcp.run(transport=args.transport, host=args.host, port=args.port)

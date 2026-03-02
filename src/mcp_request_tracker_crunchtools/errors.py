@@ -11,19 +11,12 @@ class RTError(Exception):
     """Base exception for RT-related errors."""
 
     def __init__(self, message: str) -> None:
-        # Sanitize message to remove any credential references
-        safe_message = self._sanitize(message)
-        super().__init__(safe_message)
-
-    def _sanitize(self, message: str) -> str:
-        """Remove any credential values from error messages."""
-        sensitive_vars = ["RT_PASS", "RT_HTTP_PASS"]
-        result = message
-        for var in sensitive_vars:
+        sanitized_message = message
+        for var in ("RT_PASS", "RT_HTTP_PASS"):
             value = os.environ.get(var, "")
             if value:
-                result = result.replace(value, "***")
-        return result
+                sanitized_message = sanitized_message.replace(value, "***")
+        super().__init__(sanitized_message)
 
 
 class ConfigurationError(RTError):
