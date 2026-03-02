@@ -1,6 +1,6 @@
 [project]
 name = "mcp-request-tracker-crunchtools"
-version = "0.1.0"
+version = "0.1.1"
 description = "Secure MCP server for Request Tracker (RT) ticket management"
 requires-python = ">=3.10"
 license = "AGPL-3.0-or-later"
