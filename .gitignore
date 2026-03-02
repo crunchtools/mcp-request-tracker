@@ -92,3 +92,6 @@ Thumbs.db
 # Project specific
 pass
 tmp/
+
+# MCP Registry auth tokens
+.mcpregistry_*
