@@ -10,7 +10,10 @@ LABEL name="mcp-request-tracker-crunchtools" \
       maintainer="crunchtools.com" \
       url="https://github.com/crunchtools/mcp-request-tracker" \
       io.k8s.display-name="MCP Request Tracker CrunchTools" \
-      io.openshift.tags="mcp,request-tracker,rt,tickets"
+      io.openshift.tags="mcp,request-tracker,rt,tickets" \
+      org.opencontainers.image.source="https://github.com/crunchtools/mcp-request-tracker" \
+      org.opencontainers.image.description="Secure MCP server for Request Tracker ticket management" \
+      org.opencontainers.image.licenses="AGPL-3.0-or-later"
 
 WORKDIR /app
 
