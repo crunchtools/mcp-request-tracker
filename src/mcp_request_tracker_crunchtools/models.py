@@ -6,13 +6,12 @@ enforcing field lengths, allowlists, and rejecting unexpected fields.
 
 from pydantic import BaseModel, ConfigDict, Field
 
-# Field length and value constraints
-MAX_SHORT_FIELD = 200  # Queue names, usernames, owner fields
-MAX_SUBJECT = 500  # Ticket subject lines
-MAX_TEXT = 50_000  # Large text fields (body, comments, checklists)
-MAX_STATUS = 50  # Status field names
-MAX_PRIORITY = 999  # RT priority range upper bound
-MAX_MINUTES = 99_999  # Time tracking upper bound in minutes
+MAX_SHORT_FIELD = 200
+MAX_SUBJECT = 500
+MAX_TEXT = 50_000
+MAX_STATUS = 50
+MAX_PRIORITY = 999
+MAX_MINUTES = 99_999
 
 
 class CreateTicketInput(BaseModel):
