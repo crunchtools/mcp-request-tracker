@@ -1,6 +1,6 @@
 # Claude Code Instructions
 
-Secure MCP server for Request Tracker (RT) ticket management. 16 tools across 6 categories.
+Secure MCP server for Request Tracker (RT) ticket management. 17 tools across 6 categories.
 
 ## Quick Start
 
@@ -38,12 +38,12 @@ claude mcp add mcp-request-tracker-crunchtools \
 | `RT_HTTP_USER` | No | — | HTTP Basic Auth username (if RT behind basic auth) |
 | `RT_HTTP_PASS` | No | — | HTTP Basic Auth password (if RT behind basic auth) |
 
-## Available Tools (16)
+## Available Tools (17)
 
 | Category | Tools | Operations |
 |----------|------:|------------|
 | Search/View | 5 | search, get ticket, get history, my open, new tickets |
-| Update | 5 | set owner, set status, resolve, open, take |
+| Update | 6 | set owner, set status, update fields, resolve, open, take |
 | Time Tracking | 2 | set time, add time |
 | Communication | 2 | comment (private), reply (visible) |
 | Creation | 1 | create ticket |

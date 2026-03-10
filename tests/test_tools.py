@@ -1,4 +1,4 @@
-"""Mocked tool tests for all 16 RT tools."""
+"""Mocked tool tests for all 17 RT tools."""
 
 import pytest
 
@@ -20,6 +20,7 @@ from mcp_request_tracker_crunchtools.tools import (
     set_ticket_status,
     set_time_worked,
     take_ticket,
+    update_ticket,
 )
 from tests.conftest import _mock_rt_response, _patch_rt_client
 
@@ -40,10 +41,11 @@ TOOL_FUNCTIONS = [
     reply_to_ticket,
     create_ticket,
     complete_weekly_checklist,
+    update_ticket,
 ]
 
-EXPECTED_TOOL_COUNT = 16
-EXPECTED_ALL_COUNT = 17  # 16 tools + close_client
+EXPECTED_TOOL_COUNT = 17
+EXPECTED_ALL_COUNT = 18  # 17 tools + close_client
 
 
 def test_tool_count() -> None:
@@ -178,6 +180,30 @@ class TestUpdateTools:
         async with _patch_rt_client(response=resp):
             result = await take_ticket(123, "scott")
             assert "taken by 'scott'" in result
+
+    @pytest.mark.asyncio
+    async def test_update_ticket_subject(self) -> None:
+        resp = _mock_rt_response(body="Ticket 123 updated.")
+        async with _patch_rt_client(response=resp):
+            result = await update_ticket(123, subject="New Subject")
+            assert "Ticket #123 updated" in result
+            assert "Subject=New Subject" in result
+
+    @pytest.mark.asyncio
+    async def test_update_ticket_multiple_fields(self) -> None:
+        resp = _mock_rt_response(body="Ticket 123 updated.")
+        async with _patch_rt_client(response=resp):
+            result = await update_ticket(123, subject="Title", priority=50, queue="Professional")
+            assert "Ticket #123 updated" in result
+            assert "Subject=Title" in result
+            assert "Priority=50" in result
+            assert "Queue=Professional" in result
+
+    @pytest.mark.asyncio
+    async def test_update_ticket_no_fields(self) -> None:
+        async with _patch_rt_client():
+            result = await update_ticket(123)
+            assert "No fields provided" in result
 
 
 class TestTimeTools:

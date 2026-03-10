@@ -24,6 +24,7 @@ from .tools import (
     set_ticket_status,
     set_time_worked,
     take_ticket,
+    update_ticket,
 )
 
 logging.basicConfig(
@@ -148,6 +149,27 @@ async def set_ticket_status_tool(ticket_id: int, status: str) -> str:
         Confirmation message
     """
     return await set_ticket_status(ticket_id, status)
+
+
+@mcp.tool()
+async def update_ticket_tool(
+    ticket_id: int,
+    subject: str = "",
+    priority: int | None = None,
+    queue: str = "",
+) -> str:
+    """Update ticket fields (subject, priority, queue). All fields are optional.
+
+    Args:
+        ticket_id: The ticket ID number
+        subject: New subject/title for the ticket
+        priority: New priority (0-99)
+        queue: New queue name (e.g., 'General', 'Professional')
+
+    Returns:
+        Confirmation of updated fields
+    """
+    return await update_ticket(ticket_id, subject, priority, queue)
 
 
 @mcp.tool()

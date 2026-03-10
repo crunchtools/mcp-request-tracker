@@ -236,6 +236,33 @@ async def complete_weekly_checklist(
         return f"Error completing checklist: {e}"
 
 
+async def update_ticket(
+    ticket_id: int,
+    subject: str = "",
+    priority: int | None = None,
+    queue: str = "",
+) -> str:
+    """Update ticket fields (subject, priority, queue)."""
+    client = get_rt_client()
+    try:
+        fields: dict[str, str] = {}
+        if subject:
+            fields["Subject"] = subject
+        if priority is not None:
+            fields["Priority"] = str(priority)
+        if queue:
+            fields["Queue"] = queue
+
+        if not fields:
+            return "No fields provided to update."
+
+        result = await client.update_ticket(ticket_id, **fields)
+        updated = ", ".join(f"{k}={v}" for k, v in fields.items())
+        return f"Ticket #{ticket_id} updated ({updated}).\n{result}"
+    except RTApiError as e:
+        return f"Error updating ticket: {e}"
+
+
 async def get_my_open_tickets(owner: str) -> str:
     """Get all open tickets assigned to a user."""
     client = get_rt_client()
@@ -293,4 +320,5 @@ __all__ = [
     "set_ticket_status",
     "set_time_worked",
     "take_ticket",
+    "update_ticket",
 ]

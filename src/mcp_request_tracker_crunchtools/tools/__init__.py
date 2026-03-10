@@ -21,6 +21,7 @@ from .tickets import (
     set_ticket_status,
     set_time_worked,
     take_ticket,
+    update_ticket,
 )
 
 __all__ = [
@@ -41,4 +42,5 @@ __all__ = [
     "set_ticket_status",
     "set_time_worked",
     "take_ticket",
+    "update_ticket",
 ]
