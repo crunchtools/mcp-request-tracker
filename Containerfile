@@ -4,7 +4,7 @@
 FROM quay.io/hummingbird/python:latest
 
 LABEL name="mcp-request-tracker-crunchtools" \
-      version="0.3.0" \
+      version="0.4.0" \
       summary="Secure MCP server for Request Tracker ticket management" \
       description="A security-focused MCP server for Request Tracker built on Red Hat UBI" \
       maintainer="crunchtools.com" \

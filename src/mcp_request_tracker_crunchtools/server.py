@@ -46,7 +46,7 @@ async def lifespan(_mcp: FastMCP) -> AsyncIterator[None]:
 
 mcp = FastMCP(
     name="mcp-request-tracker-crunchtools",
-    version="0.3.0",
+    version="0.4.0",
     lifespan=lifespan,
     instructions=(
         "Secure MCP server for Request Tracker (RT) ticket management. "
