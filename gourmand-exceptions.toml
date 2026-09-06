@@ -36,3 +36,8 @@ justification = "Optional API parameter builders use simple if-guards, not state
 check = "primitive_obsession"
 path = "tests/conftest.py"
 justification = "HTTP status code 200 and rt.example.com URL are standard test fixture patterns"
+
+[[exceptions]]
+check = "copy_paste_detection"
+path = "src/mcp_request_tracker_crunchtools/config.py"
+justification = "get_config and get_rt_client are both the four-line lazy-singleton accessor. The duplication is the idiom, not a factoring opportunity."
