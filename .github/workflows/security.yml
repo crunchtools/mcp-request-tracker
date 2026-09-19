@@ -101,7 +101,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: "quay.io/crunchtools/mcp-request-tracker:latest"
           format: "sarif"

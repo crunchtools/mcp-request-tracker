@@ -1,6 +1,17 @@
 # MCP Request Tracker CrunchTools Container
 # Built on Hummingbird Python image (Red Hat UBI-based) for enterprise security
 
+# Stage 1: Builder (has a shell, dnf and build tools)
+FROM quay.io/hummingbird/python:latest-builder AS builder
+USER 0
+WORKDIR /app
+RUN python3 -m venv /app/venv
+ENV PATH="/app/venv/bin:$PATH"
+COPY pyproject.toml README.md ./
+COPY src/ ./src/
+RUN pip install --no-cache-dir .
+
+# Stage 2: Runtime (distroless -- no shell, no package manager)
 FROM quay.io/hummingbird/python:latest
 
 LABEL name="mcp-request-tracker-crunchtools" \
@@ -17,12 +28,11 @@ LABEL name="mcp-request-tracker-crunchtools" \
 
 WORKDIR /app
 
-COPY pyproject.toml README.md ./
-COPY src/ ./src/
+COPY --from=builder /app/venv /app/venv
+ENV PATH="/app/venv/bin:$PATH"
 
-RUN pip install --no-cache-dir .
-
-RUN python -c "from mcp_request_tracker_crunchtools import main; print('Installation verified')"
+# Verify the install. Exec form: this stage has no /bin/sh for RUN's shell form.
+RUN ["python3", "-c", "from mcp_request_tracker_crunchtools import main; print('Installation verified')"]
 
 EXPOSE 8013
 ENTRYPOINT ["python", "-m", "mcp_request_tracker_crunchtools"]
