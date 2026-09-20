@@ -1,43 +1,46 @@
-# Gourmand Exceptions
-# Documented exceptions for files that legitimately trigger checks
-
-# Summary litter — CLAUDE.md is a standard Claude Code project instructions file
-[[exceptions]]
-check = "summary_litter"
-path = "CLAUDE.md"
-justification = "Claude Code project instructions for AI assistant orientation"
 
 # Primitive obsession — port 8000 is a standard default for HTTP servers
 [[exceptions]]
 check = "primitive_obsession"
 path = "src/mcp_request_tracker_crunchtools/__init__.py"
 justification = "Port 8000 is a standard default for HTTP servers"
-
-# Primitive obsession — HTTP status codes and timeout are standard API patterns
-[[exceptions]]
-check = "primitive_obsession"
-path = "src/mcp_request_tracker_crunchtools/client.py"
-justification = "HTTP status codes (200, 403, 500) and timeout (30s) are standard well-known constants"
-
-# Implicit state machine — ticket parsing uses simple regex matching, not state machines
-[[exceptions]]
-check = "implicit_state_machine"
-path = "src/mcp_request_tracker_crunchtools/client.py"
-justification = "Response and ticket parsing use simple regex matching patterns, not state machines"
-
-# Implicit state machine — optional parameter builders are not state machines
-[[exceptions]]
-check = "implicit_state_machine"
-path = "src/mcp_request_tracker_crunchtools/tools/tickets.py"
-justification = "Optional API parameter builders use simple if-guards, not state machines"
-
-# Primitive obsession — HTTP status code 200 and mock URL are standard test patterns
-[[exceptions]]
-check = "primitive_obsession"
-path = "tests/conftest.py"
-justification = "HTTP status code 200 and rt.example.com URL are standard test fixture patterns"
+classification = "by_design"
 
 [[exceptions]]
 check = "copy_paste_detection"
 path = "src/mcp_request_tracker_crunchtools/config.py"
 justification = "get_config and get_rt_client are both the four-line lazy-singleton accessor. The duplication is the idiom, not a factoring opportunity."
+classification = "by_design"
+
+# All five vars documented in README.md and CLAUDE.md, verified against
+# config.py's source: RT_URL/RT_USER/RT_PASS are required (raise
+# ConfigurationError if missing), RT_HTTP_USER/RT_HTTP_PASS are optional
+# with no default (None). Not added to allowed_names, per upstream
+# guidance: this exception is the reviewed confirmation that each is
+# documented, not a silencing of the check.
+[[exceptions]]
+check = "hidden_env_config"
+path = "src/mcp_request_tracker_crunchtools/config.py"
+justification = "RT_URL, RT_USER, RT_PASS, RT_HTTP_USER, and RT_HTTP_PASS are documented in README.md and CLAUDE.md's Environment Variables tables; required/optional status verified against config.py's source"
+classification = "by_design"
+
+# Manifest lint suppression on pyproject.toml. All 14 entries are
+# per-file-ignores (the global ignore list is now empty), each audited
+# with `ruff check --select <RULE>` and scoped to its confirmed sites.
+# Real hit counts, by rule:
+#   TRY300 (server.py + tickets.py, pre-existing, unrelated to this pass)
+#   PLR0913/PLR0917 (server.py + tickets.py, 2 hits each): the MCP tool
+#     wrapper and its implementation for create_ticket, which legitimately
+#     takes several independent optional fields
+#   TRY003 (config.py, 3 hits): long messages in Config's own
+#     ConfigurationError raises for missing required env vars
+#   PLW0603 (config.py 1 hit + tickets.py 2 hits): the module-global
+#     singleton accessor idiom (get_config/get_rt_client)
+#   PLR2004 (client.py, 7 hits): HTTP status codes in the error dispatch
+#   S101/S105/PLC0415/PLR2004 (tests/*): test-only patterns, none fire in
+#     src/
+[[exceptions]]
+check = "manifest_lint_suppression"
+path = "pyproject.toml"
+justification = "Every ignore entry is a per-file-ignore audited with `ruff check --select <RULE>` and scoped to its actual violation sites; the global ignore list is empty. See pyproject.toml and gourmand-exceptions.toml comments for real hit counts per rule"
+classification = "by_design"

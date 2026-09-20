@@ -49,21 +49,27 @@ target-version = "py310"
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP", "S", "B", "C4", "C901", "DTZ", "T10", "ISC", "PIE", "PT", "RET", "SIM", "TID", "TCH", "ARG", "PLC", "PLE", "PLR", "PLW", "TRY", "RUF"]
 ignore = [
-    "S101",     # assert allowed in tests
-    "TRY003",   # long exception messages ok
-    "PLR0913",  # many arguments ok for MCP tools
-    "PLR0917",  # ditto, positional: MCP tool signatures mirror the wire API
-    "PLR2004",  # magic numbers ok (HTTP status codes)
-    "PLW0603",  # global statement ok for singletons
 ]
 
 [tool.ruff.lint.pylint]
 max-branches = 10
 max-statements = 50
 
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S105", "PLC0415", "PLR2004"]
-"src/mcp_request_tracker_crunchtools/tools/tickets.py" = ["TRY300"]
+"tests/*" = ["S101", "S105", "PLC0415", "PLR2004"]
+# PLR0913/PLR0917: 2 hits each, the MCP tool wrapper (server.py) and its
+# implementation (tools/tickets.py) for create_ticket, which legitimately
+# takes several independent optional fields.
+"src/mcp_request_tracker_crunchtools/server.py" = ["TRY300", "PLR0913", "PLR0917"]
+"src/mcp_request_tracker_crunchtools/tools/tickets.py" = ["TRY300", "PLR0913", "PLR0917", "PLW0603"]
+# TRY003: 3 hits, all in config.py's own required-env-var ConfigurationError
+# messages.
+"src/mcp_request_tracker_crunchtools/config.py" = ["TRY003", "PLW0603"]
+# PLR2004: 7 hits, HTTP status codes in client.py's error dispatch.
+"src/mcp_request_tracker_crunchtools/client.py" = ["PLR2004"]
 
 [tool.mypy]
 python_version = "3.10"
