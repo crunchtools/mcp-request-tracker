@@ -2,6 +2,7 @@
 
 import pytest
 
+from mcp_request_tracker_crunchtools.server import mcp
 from mcp_request_tracker_crunchtools.tools import __all__ as tools_all
 from mcp_request_tracker_crunchtools.tools import (
     add_ticket_comment,
@@ -58,6 +59,72 @@ def test_imports() -> None:
     assert len(TOOL_FUNCTIONS) == EXPECTED_TOOL_COUNT
     for func in TOOL_FUNCTIONS:
         assert callable(func)
+
+
+READ_ONLY = frozenset(
+    {
+        "search_tickets_tool",
+        "get_ticket_tool",
+        "get_ticket_history_tool",
+        "get_my_open_tickets_tool",
+        "get_new_tickets_tool",
+    }
+)
+WRITES = frozenset(
+    {
+        "set_ticket_owner_tool",
+        "set_ticket_status_tool",
+        "update_ticket_tool",
+        "resolve_ticket_tool",
+        "open_ticket_tool",
+        "take_ticket_tool",
+        "set_time_worked_tool",
+        "add_time_worked_tool",
+        "add_ticket_comment_tool",
+        "reply_to_ticket_tool",
+        "create_ticket_tool",
+        "complete_weekly_checklist_tool",
+    }
+)
+
+# Arguments that satisfy each read-only tool's required parameters.
+READ_ONLY_CALLS = {
+    "search_tickets_tool": {"query": "Status = 'new'"},
+    "get_ticket_tool": {"ticket_id": 123},
+    "get_ticket_history_tool": {"ticket_id": 123},
+    "get_my_open_tickets_tool": {"owner": "scott"},
+    "get_new_tickets_tool": {"queue": "General"},
+}
+
+
+class TestReadOnlyAnnotation:
+    """Every registered tool is classified, and the reads really only read."""
+
+    @pytest.mark.asyncio
+    async def test_every_tool_is_classified(self) -> None:
+        tools = await mcp.list_tools()
+        assert READ_ONLY.isdisjoint(WRITES)
+        assert {tool.name for tool in tools} == READ_ONLY | WRITES
+        annotated = {
+            tool.name
+            for tool in tools
+            if tool.annotations is not None
+            and tool.annotations.model_dump(by_alias=True).get("readOnlyHint") is True
+        }
+        assert annotated == READ_ONLY
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("name", sorted(READ_ONLY))
+    async def test_read_only_tool_sends_no_content(self, name: str) -> None:
+        """RT REST 1.0 is POST-only; a write is a POST carrying a `content` form."""
+        async with _patch_rt_client(response=_mock_rt_response(body="123: Ticket")) as post:
+            await mcp.call_tool(name, READ_ONLY_CALLS[name])
+        assert post.await_count >= 1
+        for call in post.await_args_list:
+            assert "content" not in call.kwargs["data"]
+            assert "/edit" not in call.args[0]
+            assert "/comment" not in call.args[0]
+            assert "/new" not in call.args[0]
 
 
 class TestSearchTools:
