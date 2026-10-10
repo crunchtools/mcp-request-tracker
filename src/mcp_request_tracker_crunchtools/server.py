@@ -34,6 +34,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# A gateway drops an invalid optional argument only on a tool annotated read-only;
+# on anything else it refuses the call. Only tools that change nothing in RT get this.
+READ_ONLY = {"readOnlyHint": True}
+
 
 @asynccontextmanager
 async def lifespan(_mcp: FastMCP) -> AsyncIterator[None]:
@@ -46,7 +50,7 @@ async def lifespan(_mcp: FastMCP) -> AsyncIterator[None]:
 
 mcp = FastMCP(
     name="mcp-request-tracker-crunchtools",
-    version="0.4.0",
+    version="0.5.0",
     lifespan=lifespan,
     instructions=(
         "Secure MCP server for Request Tracker (RT) ticket management. "
@@ -56,7 +60,7 @@ mcp = FastMCP(
 )
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def search_tickets_tool(query: str, order_by: str = "-Created") -> str:
     """Search for tickets using RT query syntax.
 
@@ -71,7 +75,7 @@ async def search_tickets_tool(query: str, order_by: str = "-Created") -> str:
     return await search_tickets(query, order_by)
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def get_ticket_tool(ticket_id: int) -> str:
     """Get details of a specific ticket.
 
@@ -84,7 +88,7 @@ async def get_ticket_tool(ticket_id: int) -> str:
     return await get_ticket(ticket_id)
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def get_ticket_history_tool(ticket_id: int) -> str:
     """Get the history/changelog of a ticket.
 
@@ -97,7 +101,7 @@ async def get_ticket_history_tool(ticket_id: int) -> str:
     return await get_ticket_history(ticket_id)
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def get_my_open_tickets_tool(owner: str) -> str:
     """Get all open tickets assigned to a user.
 
@@ -110,7 +114,7 @@ async def get_my_open_tickets_tool(owner: str) -> str:
     return await get_my_open_tickets(owner)
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def get_new_tickets_tool(queue: str = "") -> str:
     """Get all new (unassigned) tickets, optionally filtered by queue.
 
