@@ -3,8 +3,10 @@
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Annotated
 
 from fastmcp import FastMCP
+from pydantic import Field
 
 from .tools import (
     add_ticket_comment,
@@ -37,6 +39,9 @@ logger = logging.getLogger(__name__)
 # A gateway drops an invalid optional argument only on a tool annotated read-only;
 # on anything else it refuses the call. Only tools that change nothing in RT get this.
 READ_ONLY = {"readOnlyHint": True}
+
+# RT ticket IDs start at 1; publishing the minimum lets 0 and negatives fail schema validation.
+TicketId = Annotated[int, Field(ge=1)]
 
 
 @asynccontextmanager
@@ -76,7 +81,7 @@ async def search_tickets_tool(query: str, order_by: str = "-Created") -> str:
 
 
 @mcp.tool(annotations=READ_ONLY)
-async def get_ticket_tool(ticket_id: int) -> str:
+async def get_ticket_tool(ticket_id: TicketId) -> str:
     """Get details of a specific ticket.
 
     Args:
@@ -89,7 +94,7 @@ async def get_ticket_tool(ticket_id: int) -> str:
 
 
 @mcp.tool(annotations=READ_ONLY)
-async def get_ticket_history_tool(ticket_id: int) -> str:
+async def get_ticket_history_tool(ticket_id: TicketId) -> str:
     """Get the history/changelog of a ticket.
 
     Args:
@@ -128,7 +133,7 @@ async def get_new_tickets_tool(queue: str = "") -> str:
 
 
 @mcp.tool()
-async def set_ticket_owner_tool(ticket_id: int, owner: str) -> str:
+async def set_ticket_owner_tool(ticket_id: TicketId, owner: str) -> str:
     """Set the owner of a ticket (take/assign ticket).
 
     Args:
@@ -142,7 +147,7 @@ async def set_ticket_owner_tool(ticket_id: int, owner: str) -> str:
 
 
 @mcp.tool()
-async def set_ticket_status_tool(ticket_id: int, status: str) -> str:
+async def set_ticket_status_tool(ticket_id: TicketId, status: str) -> str:
     """Set the status of a ticket.
 
     Args:
@@ -157,7 +162,7 @@ async def set_ticket_status_tool(ticket_id: int, status: str) -> str:
 
 @mcp.tool()
 async def update_ticket_tool(
-    ticket_id: int,
+    ticket_id: TicketId,
     subject: str = "",
     priority: int | None = None,
     queue: str = "",
@@ -177,7 +182,7 @@ async def update_ticket_tool(
 
 
 @mcp.tool()
-async def resolve_ticket_tool(ticket_id: int, comment: str = "") -> str:
+async def resolve_ticket_tool(ticket_id: TicketId, comment: str = "") -> str:
     """Resolve/close a ticket, optionally adding a comment.
 
     Args:
@@ -191,7 +196,7 @@ async def resolve_ticket_tool(ticket_id: int, comment: str = "") -> str:
 
 
 @mcp.tool()
-async def open_ticket_tool(ticket_id: int, owner: str = "") -> str:
+async def open_ticket_tool(ticket_id: TicketId, owner: str = "") -> str:
     """Open a ticket (change status from new to open), optionally taking ownership.
 
     Args:
@@ -205,7 +210,7 @@ async def open_ticket_tool(ticket_id: int, owner: str = "") -> str:
 
 
 @mcp.tool()
-async def take_ticket_tool(ticket_id: int, username: str) -> str:
+async def take_ticket_tool(ticket_id: TicketId, username: str) -> str:
     """Take ownership of a ticket and open it.
 
     Args:
@@ -219,7 +224,7 @@ async def take_ticket_tool(ticket_id: int, username: str) -> str:
 
 
 @mcp.tool()
-async def set_time_worked_tool(ticket_id: int, minutes: int) -> str:
+async def set_time_worked_tool(ticket_id: TicketId, minutes: Annotated[int, Field(ge=0)]) -> str:
     """Set the total time worked on a ticket.
 
     Args:
@@ -233,7 +238,7 @@ async def set_time_worked_tool(ticket_id: int, minutes: int) -> str:
 
 
 @mcp.tool()
-async def add_time_worked_tool(ticket_id: int, minutes: int) -> str:
+async def add_time_worked_tool(ticket_id: TicketId, minutes: Annotated[int, Field(ge=1)]) -> str:
     """Add time to the time worked on a ticket.
 
     Args:
@@ -247,7 +252,7 @@ async def add_time_worked_tool(ticket_id: int, minutes: int) -> str:
 
 
 @mcp.tool()
-async def add_ticket_comment_tool(ticket_id: int, comment: str) -> str:
+async def add_ticket_comment_tool(ticket_id: TicketId, comment: str) -> str:
     """Add a private comment/note to a ticket (not visible to requestor).
 
     Args:
@@ -261,7 +266,7 @@ async def add_ticket_comment_tool(ticket_id: int, comment: str) -> str:
 
 
 @mcp.tool()
-async def reply_to_ticket_tool(ticket_id: int, message: str) -> str:
+async def reply_to_ticket_tool(ticket_id: TicketId, message: str) -> str:
     """Reply to a ticket (correspondence visible to requestor).
 
     Args:
@@ -301,10 +306,10 @@ async def create_ticket_tool(
 
 @mcp.tool()
 async def complete_weekly_checklist_tool(
-    ticket_id: int,
+    ticket_id: TicketId,
     owner: str,
     checklist_results: str,
-    time_minutes: int = 0,
+    time_minutes: Annotated[int, Field(ge=0)] = 0,
 ) -> str:
     """Complete a weekly checklist ticket with results.
 

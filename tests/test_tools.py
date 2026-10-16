@@ -127,6 +127,27 @@ class TestReadOnlyAnnotation:
             assert "/new" not in call.args[0]
 
 
+class TestPublishedMinimums:
+    """Integer arguments publish their minimums in the registered schema."""
+
+    @pytest.mark.asyncio
+    async def test_integer_minimums_are_published(self) -> None:
+        tools = {tool.name: tool for tool in await mcp.list_tools()}
+        with_ids = 0
+        for name, tool in tools.items():
+            props = tool.parameters["properties"]
+            if "ticket_id" in props:
+                with_ids += 1
+                assert props["ticket_id"]["minimum"] == 1, name
+        assert with_ids == 13
+        add = tools["add_time_worked_tool"].parameters["properties"]
+        assert add["minutes"]["minimum"] == 1
+        set_ = tools["set_time_worked_tool"].parameters["properties"]
+        assert set_["minutes"]["minimum"] == 0
+        checklist = tools["complete_weekly_checklist_tool"].parameters["properties"]
+        assert checklist["time_minutes"]["minimum"] == 0
+
+
 class TestSearchTools:
     """Tests for search and view tools."""
 
