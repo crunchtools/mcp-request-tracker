@@ -2,7 +2,7 @@
 # Built on Hummingbird Python image (Red Hat UBI-based) for enterprise security
 
 # Stage 1: Builder (has a shell, dnf and build tools)
-FROM quay.io/hummingbird/python:latest-builder AS builder
+FROM quay.io/hummingbird/python:3.14-builder AS builder
 USER 0
 WORKDIR /app
 RUN python3 -m venv /app/venv
@@ -12,7 +12,7 @@ COPY src/ ./src/
 RUN pip install --no-cache-dir .
 
 # Stage 2: Runtime (distroless -- no shell, no package manager)
-FROM quay.io/hummingbird/python:latest
+FROM quay.io/hummingbird/python:3.14
 
 LABEL name="mcp-request-tracker-crunchtools" \
       version="0.6.0" \
