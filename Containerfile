@@ -15,7 +15,7 @@ RUN pip install --no-cache-dir .
 FROM quay.io/hummingbird/python:3.14
 
 LABEL name="mcp-request-tracker-crunchtools" \
-      version="0.7.0" \
+      version="0.7.1" \
       summary="Secure MCP server for Request Tracker ticket management" \
       description="A security-focused MCP server for Request Tracker built on Red Hat UBI" \
       maintainer="crunchtools.com" \
