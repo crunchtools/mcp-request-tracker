@@ -30,22 +30,19 @@ class Config:
         url = os.environ.get("RT_URL")
         if not url:
             raise ConfigurationError(
-                "RT_URL environment variable required. "
-                "Set it to your Request Tracker server URL."
+                "RT_URL environment variable required. Set it to your Request Tracker server URL."
             )
 
         username = os.environ.get("RT_USER")
         if not username:
             raise ConfigurationError(
-                "RT_USER environment variable required. "
-                "Set it to your Request Tracker username."
+                "RT_USER environment variable required. Set it to your Request Tracker username."
             )
 
         password = os.environ.get("RT_PASS")
         if not password:
             raise ConfigurationError(
-                "RT_PASS environment variable required. "
-                "Set it to your Request Tracker password."
+                "RT_PASS environment variable required. Set it to your Request Tracker password."
             )
 
         self._url = url.rstrip("/")

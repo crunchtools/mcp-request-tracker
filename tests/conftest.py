@@ -51,7 +51,5 @@ async def _patch_rt_client(
     else:
         mock_post.return_value = _mock_rt_response()
 
-    with patch.dict(os.environ, env, clear=True), patch(
-        "httpx.AsyncClient.post", mock_post
-    ):
+    with patch.dict(os.environ, env, clear=True), patch("httpx.AsyncClient.post", mock_post):
         yield mock_post

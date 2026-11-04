@@ -139,15 +139,15 @@ class RTClient:
                 continue
             match = re.match(r"^(\d+): (.+)$", stripped)
             if match:
-                results.append({
-                    "id": match.group(1),
-                    "Subject": match.group(2),
-                })
+                results.append(
+                    {
+                        "id": match.group(1),
+                        "Subject": match.group(2),
+                    }
+                )
         return results
 
-    async def search_tickets(
-        self, query: str, order_by: str = "-Created"
-    ) -> list[dict[str, str]]:
+    async def search_tickets(self, query: str, order_by: str = "-Created") -> list[dict[str, str]]:
         """Search for tickets using RT query syntax.
 
         Args:
@@ -204,9 +204,7 @@ class RTClient:
         Raises:
             RTApiError: On API errors.
         """
-        response = await self._request(
-            f"ticket/{ticket_id}/history", params={"format": "l"}
-        )
+        response = await self._request(f"ticket/{ticket_id}/history", params={"format": "l"})
         status, message, body = self._parse_response(response)
 
         if status != 200:
@@ -233,9 +231,7 @@ class RTClient:
 
         content = "\n".join(content_lines)
 
-        response = await self._request(
-            f"ticket/{ticket_id}/edit", data={"content": content}
-        )
+        response = await self._request(f"ticket/{ticket_id}/edit", data={"content": content})
         status, message, body = self._parse_response(response)
 
         if status != 200:
@@ -277,9 +273,7 @@ class RTClient:
         """Add correspondence (reply) to ticket."""
         formatted_text = self._format_multiline_text(text)
         content = f"id: {ticket_id}\nAction: correspond\nText: {formatted_text}"
-        response = await self._request(
-            f"ticket/{ticket_id}/comment", data={"content": content}
-        )
+        response = await self._request(f"ticket/{ticket_id}/comment", data={"content": content})
         status, message, body = self._parse_response(response)
 
         if status != 200:
@@ -291,9 +285,7 @@ class RTClient:
         """Add comment (private note) to ticket."""
         formatted_text = self._format_multiline_text(text)
         content = f"id: {ticket_id}\nAction: comment\nText: {formatted_text}"
-        response = await self._request(
-            f"ticket/{ticket_id}/comment", data={"content": content}
-        )
+        response = await self._request(f"ticket/{ticket_id}/comment", data={"content": content})
         status, message, body = self._parse_response(response)
 
         if status != 200:

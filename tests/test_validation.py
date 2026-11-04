@@ -14,8 +14,9 @@ class TestConfig:
         from mcp_request_tracker_crunchtools.config import Config
         from mcp_request_tracker_crunchtools.errors import ConfigurationError
 
-        with patch.dict(os.environ, {}, clear=True), pytest.raises(
-            ConfigurationError, match="RT_URL"
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            pytest.raises(ConfigurationError, match="RT_URL"),
         ):
             Config()
 
@@ -24,9 +25,10 @@ class TestConfig:
         from mcp_request_tracker_crunchtools.config import Config
         from mcp_request_tracker_crunchtools.errors import ConfigurationError
 
-        with patch.dict(
-            os.environ, {"RT_URL": "https://rt.example.com"}, clear=True
-        ), pytest.raises(ConfigurationError, match="RT_USER"):
+        with (
+            patch.dict(os.environ, {"RT_URL": "https://rt.example.com"}, clear=True),
+            pytest.raises(ConfigurationError, match="RT_USER"),
+        ):
             Config()
 
     def test_config_requires_pass(self) -> None:
@@ -35,8 +37,9 @@ class TestConfig:
         from mcp_request_tracker_crunchtools.errors import ConfigurationError
 
         env = {"RT_URL": "https://rt.example.com", "RT_USER": "test"}
-        with patch.dict(os.environ, env, clear=True), pytest.raises(
-            ConfigurationError, match="RT_PASS"
+        with (
+            patch.dict(os.environ, env, clear=True),
+            pytest.raises(ConfigurationError, match="RT_PASS"),
         ):
             Config()
 
