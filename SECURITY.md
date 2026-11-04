@@ -76,6 +76,7 @@ Credentials are handled with multiple protections:
 ```python
 from pydantic import SecretStr
 
+
 class Config:
     def __init__(self) -> None:
         password = os.environ.get("RT_PASS")
