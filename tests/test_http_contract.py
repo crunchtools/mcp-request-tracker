@@ -179,10 +179,13 @@ class TestTransportFailuresNameTheRequest:
         with _serving(handler) as rt, pytest.raises(RTApiError) as caught:
             await rt._request("ticket/1/show")
 
-        message = str(caught.value)
-        assert "Request timeout" in message
-        assert "rt.example.com" in message
-        assert "ticket/1/show" in message
+        # The whole message, not a substring: CodeQL is right that
+        # `"rt.example.com" in message` also passes for a URL that merely
+        # contains the host, and the exact message is the stronger claim.
+        assert str(caught.value) == (
+            "RT API error 0: Request timeout: "
+            "POST https://rt.example.com/REST/1.0/ticket/1/show: timeout"
+        )
 
     @pytest.mark.asyncio
     async def test_a_connection_failure_names_the_url(self) -> None:
