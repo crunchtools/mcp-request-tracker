@@ -8,6 +8,7 @@ import logging
 import re
 from importlib.metadata import version
 from typing import Any
+from urllib.parse import quote, quote_plus
 
 import httpx
 
@@ -31,15 +32,20 @@ USER_AGENT = (
 )
 
 
+def _snippet(text: str, truncated: bool = False) -> str:
+    """A short, single-line excerpt of some text, for an error message."""
+    collapsed = " ".join(text.split())
+    if not collapsed:
+        return "<empty body>"
+    if len(collapsed) > BODY_SNIPPET_CHARS or truncated:
+        return collapsed[: BODY_SNIPPET_CHARS - len(ELLIPSIS)] + ELLIPSIS
+    return collapsed
+
+
 def _body_snippet(body: bytes) -> str:
     """A short, single-line excerpt of a response body, for an error message."""
     prefix = body[: BODY_SNIPPET_CHARS * 4]
-    collapsed = " ".join(prefix.decode("utf-8", errors="replace").split())
-    if not collapsed:
-        return "<empty body>"
-    if len(collapsed) > BODY_SNIPPET_CHARS or len(body) > len(prefix):
-        return collapsed[: BODY_SNIPPET_CHARS - len(ELLIPSIS)] + ELLIPSIS
-    return collapsed
+    return _snippet(prefix.decode("utf-8", errors="replace"), truncated=len(body) > len(prefix))
 
 
 def _where(response: httpx.Response) -> str:
@@ -132,10 +138,13 @@ class RTClient:
                 body = await self._read_capped(response)
             finally:
                 await response.aclose()
+        # The URL is named here too, not only on an HTTP status: httpx's own
+        # exception message does not reliably carry it, and a timeout with no
+        # endpoint in it is the hardest failure of the three to place.
         except httpx.TimeoutException as e:
-            raise RTApiError(0, f"Request timeout: {e}") from e
+            raise RTApiError(0, f"Request timeout: POST {url}: {e}") from e
         except httpx.RequestError as e:
-            raise RTApiError(0, f"Request failed: {e}") from e
+            raise RTApiError(0, f"Request failed: POST {url}: {e}") from e
 
         if not response.is_success:
             raise RTApiError(
@@ -152,12 +161,29 @@ class RTClient:
         reflects the password. `RTApiError` does not scrub, unlike some of the
         other servers in the fleet, so it is done here, where the body is first
         turned into a message (Layer 1).
+
+        Two things this has to get right, both of which a redact-then-truncate
+        or raw-string-only version gets wrong:
+
+        * The echoed body is FORM-ENCODED, so a password with a reserved
+          character in it comes back percent-encoded -- `a&b` as `a%26b`, a
+          space as `+` or `%20` -- and a raw replace would walk straight past
+          it. Every encoding of the secret is replaced, not just the one that
+          was configured.
+        * The redaction happens BEFORE the snippet is cut. Truncating first
+          leaves the tail of a password that straddles the boundary.
+
+        The whole body is decoded for this, which is why it is only on the
+        error path: the body is already bounded, and a partially redacted
+        credential is worse than the work.
         """
-        snippet = _body_snippet(body)
+        text = body.decode("utf-8", errors="replace")
         for secret in (self._config.password, self._config.http_password):
-            if secret:
-                snippet = snippet.replace(secret, "***")
-        return snippet
+            if not secret:
+                continue
+            for encoded in {secret, quote(secret, safe=""), quote_plus(secret)}:
+                text = text.replace(encoded, "***")
+        return _snippet(text)
 
     async def _read_capped(self, response: httpx.Response) -> bytes:
         """Read the body, aborting as soon as it would pass MAX_RESPONSE_SIZE.

@@ -117,10 +117,12 @@ class TestReadOnlyAnnotation:
     @pytest.mark.parametrize("name", sorted(READ_ONLY))
     async def test_read_only_tool_sends_no_content(self, name: str) -> None:
         """RT REST 1.0 is POST-only; a write is a POST carrying a `content` form."""
-        async with _patch_rt_client(response=_mock_rt_response(body="123: Ticket")) as post:
+        async with _patch_rt_client(
+            response=_mock_rt_response(body="123: Ticket")
+        ) as build_request:
             await mcp.call_tool(name, READ_ONLY_CALLS[name])
-        assert post.call_count >= 1
-        for call in post.call_args_list:
+        assert build_request.call_count >= 1
+        for call in build_request.call_args_list:
             # autospec passes the client as args[0], so the method and URL are
             # args[1] and args[2].
             url = call.args[2]
