@@ -37,19 +37,38 @@ async def _patch_rt_client(
     response: httpx.Response | None = None,
     side_effect: list[httpx.Response] | None = None,
 ) -> AsyncIterator[AsyncMock]:
-    """Patch httpx.AsyncClient.post to return mock RT responses."""
+    """Patch the client to answer with mock RT responses.
+
+    The client streams now: `build_request` then `send(..., stream=True)`. Only
+    `send` is scripted; `build_request` is wrapped so it still builds a real
+    request and records what the caller asked for, which is what the url and
+    form assertions here are about.
+
+    What a patch at this level cannot see is the client's own behaviour -- the
+    User-Agent it adds and the bounded read it performs. Those are tested in
+    `test_http_contract.py` over a `MockTransport` (constitution v1.36.0,
+    Layer 3).
+    """
     env = {
         "RT_URL": "https://rt.example.com",
         "RT_USER": "test_user",
-        "RT_PASS": "test_pass",
+        "RT_PASS": "test_pass",  # gatehouse: allow-secret
     }
-    mock_post = AsyncMock()
+    mock_send = AsyncMock()
     if side_effect is not None:
-        mock_post.side_effect = side_effect
+        mock_send.side_effect = side_effect
     elif response is not None:
-        mock_post.return_value = response
+        mock_send.return_value = response
     else:
-        mock_post.return_value = _mock_rt_response()
+        mock_send.return_value = _mock_rt_response()
 
-    with patch.dict(os.environ, env, clear=True), patch("httpx.AsyncClient.post", mock_post):
-        yield mock_post
+    real_build = httpx.AsyncClient.build_request
+
+    with (
+        patch.dict(os.environ, env, clear=True),
+        patch("httpx.AsyncClient.send", mock_send),
+        patch.object(
+            httpx.AsyncClient, "build_request", autospec=True, side_effect=real_build
+        ) as mock_build,
+    ):
+        yield mock_build

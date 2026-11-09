@@ -6,6 +6,7 @@ All credentials are handled via the Config class using SecretStr.
 
 import logging
 import re
+from importlib.metadata import version
 from typing import Any
 
 import httpx
@@ -14,6 +15,44 @@ from .config import Config
 from .errors import RTApiError
 
 logger = logging.getLogger(__name__)
+
+# An RT ticket history with attachments is the biggest body here.
+MAX_RESPONSE_SIZE = 10 * 1024 * 1024
+BODY_SNIPPET_CHARS = 200
+ELLIPSIS = "..."
+
+# Identify this client by name. httpx otherwise sends `python-httpx/<version>`,
+# which bot protection answers with an HTML challenge page instead of the API --
+# the failure that cost an afternoon on mcp-wordpress (RT #1596). The version
+# comes from installed package metadata so it cannot drift from pyproject.toml.
+USER_AGENT = (
+    f"mcp-request-tracker-crunchtools/{version('mcp-request-tracker-crunchtools')} "
+    "(+https://github.com/crunchtools/mcp-request-tracker)"
+)
+
+
+def _body_snippet(body: bytes) -> str:
+    """A short, single-line excerpt of a response body, for an error message."""
+    prefix = body[: BODY_SNIPPET_CHARS * 4]
+    collapsed = " ".join(prefix.decode("utf-8", errors="replace").split())
+    if not collapsed:
+        return "<empty body>"
+    if len(collapsed) > BODY_SNIPPET_CHARS or len(body) > len(prefix):
+        return collapsed[: BODY_SNIPPET_CHARS - len(ELLIPSIS)] + ELLIPSIS
+    return collapsed
+
+
+def _where(response: httpx.Response) -> str:
+    """Which request a response answered, for an error message.
+
+    The URL actually requested, which matters here because this client follows
+    redirects: an RT behind Cloudflare Access answers from somewhere else
+    entirely, and that is the case `raise_for_status()` could not describe.
+    """
+    return (
+        f"{response.request.method} {response.request.url} "
+        f"(HTTP {response.status_code}, {response.headers.get('content-type', 'no content-type')})"
+    )
 
 
 class RTClient:
@@ -43,6 +82,7 @@ class RTClient:
                 auth=auth,
                 timeout=30.0,
                 follow_redirects=True,
+                headers={"User-Agent": USER_AGENT},
             )
         return self._client
 
@@ -63,7 +103,9 @@ class RTClient:
             Response text from RT.
 
         Raises:
-            httpx.HTTPError: On HTTP errors.
+            RTApiError: On a transport failure, an oversized body, or an
+                unsuccessful status -- naming the request in each case, since
+                `raise_for_status()` could not say which URL answered.
         """
         client = await self._get_client()
         url = f"{self._config.api_base_url}/{endpoint}"
@@ -83,9 +125,64 @@ class RTClient:
                 url = url + "?" + "&".join(query_parts)
 
         logger.debug("Making request to %s", endpoint)
-        response = await client.post(url, data=form_data)
-        response.raise_for_status()
-        return response.text
+        request = client.build_request("POST", url, data=form_data)
+        try:
+            response = await client.send(request, stream=True)
+            try:
+                body = await self._read_capped(response)
+            finally:
+                await response.aclose()
+        except httpx.TimeoutException as e:
+            raise RTApiError(0, f"Request timeout: {e}") from e
+        except httpx.RequestError as e:
+            raise RTApiError(0, f"Request failed: {e}") from e
+
+        if not response.is_success:
+            raise RTApiError(
+                response.status_code,
+                f"{_where(response)} returned {self._safe_snippet(body)}",
+            )
+        return body.decode("utf-8", errors="replace")
+
+    def _safe_snippet(self, body: bytes) -> str:
+        """A body excerpt with this client's own credentials taken out.
+
+        RT REST 1.0 takes `user` and `pass` in the POST body, so a page that
+        echoes the request back -- a proxy debug page, an SSO interstitial --
+        reflects the password. `RTApiError` does not scrub, unlike some of the
+        other servers in the fleet, so it is done here, where the body is first
+        turned into a message (Layer 1).
+        """
+        snippet = _body_snippet(body)
+        for secret in (self._config.password, self._config.http_password):
+            if secret:
+                snippet = snippet.replace(secret, "***")
+        return snippet
+
+    async def _read_capped(self, response: httpx.Response) -> bytes:
+        """Read the body, aborting as soon as it would pass MAX_RESPONSE_SIZE.
+
+        There was no limit here at all: a ticket history with attachments, or
+        anything else answering on that URL, was read whole into the process.
+        Measured before each chunk is copied in, because `aiter_bytes()`
+        promises nothing about chunk size.
+        """
+        declared = response.headers.get("content-length")
+        if declared and declared.isdigit() and int(declared) > MAX_RESPONSE_SIZE:
+            raise RTApiError(
+                response.status_code,
+                f"{_where(response)} declared {declared} bytes, over the "
+                f"{MAX_RESPONSE_SIZE} byte limit",
+            )
+        body = bytearray()
+        async for chunk in response.aiter_bytes():
+            if len(body) + len(chunk) > MAX_RESPONSE_SIZE:
+                raise RTApiError(
+                    response.status_code,
+                    f"{_where(response)} sent over the {MAX_RESPONSE_SIZE} byte limit",
+                )
+            body += chunk
+        return bytes(body)
 
     def _parse_response(self, text: str) -> tuple[int, str, str]:
         """Parse RT response into status code, message, and body."""

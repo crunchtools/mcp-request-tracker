@@ -119,12 +119,15 @@ class TestReadOnlyAnnotation:
         """RT REST 1.0 is POST-only; a write is a POST carrying a `content` form."""
         async with _patch_rt_client(response=_mock_rt_response(body="123: Ticket")) as post:
             await mcp.call_tool(name, READ_ONLY_CALLS[name])
-        assert post.await_count >= 1
-        for call in post.await_args_list:
+        assert post.call_count >= 1
+        for call in post.call_args_list:
+            # autospec passes the client as args[0], so the method and URL are
+            # args[1] and args[2].
+            url = call.args[2]
             assert "content" not in call.kwargs["data"]
-            assert "/edit" not in call.args[0]
-            assert "/comment" not in call.args[0]
-            assert "/new" not in call.args[0]
+            assert "/edit" not in url
+            assert "/comment" not in url
+            assert "/new" not in url
 
 
 class TestPublishedMinimums:
