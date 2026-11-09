@@ -1,0 +1,28 @@
+# Judged Gatehouse findings. Each needs a status and a reason; see
+# crunchtools/gatehouse. Everything here was raised against the RT #1601
+# outbound HTTP contract work (constitution v1.36.0, MCP Server profile 1.8.0).
+
+# HIGH: the body snippet in an error may carry ticket or customer data.
+# True, and it is the third MUST of the profile rather than an oversight.
+[[findings]]
+agent = "security"
+category = "security"
+file = "src/mcp_request_tracker_crunchtools/client.py"
+evidence = "if not response.is_success:\n    raise RTApiError(\n        response.status_code,\n        f\"{_where(response)} returned {self._safe_snippet(body)}\",\n    )"
+status = "by-design"
+reason = """
+RT ticket content is this server's payload, not a secret it holds back: every
+successful call returns the whole body to the caller, so a 200-character
+snippet on the failure path discloses nothing the success path does not
+disclose in full, to the same caller, over the same channel. What the snippet
+adds is the case where the body is NOT RT -- a Cloudflare Access page, an SSO
+interstitial, a 404 from a reverse proxy -- which is exactly RT #1596, where
+`raise_for_status()` named neither the URL nor the body and the failure read as
+a parse error for an afternoon. Credentials are a different question from
+ticket data and are handled: both configured passwords and the base64 Basic
+header are redacted before the snippet is cut, and a body that still holds one,
+or that would not settle under decoding, is withheld whole.
+"""
+
+# LOW: the autospecced `build_request` mock is function-like, so the annotation
+# said AsyncMock while the yielded object is a MagicMock. Fixed, not judged.

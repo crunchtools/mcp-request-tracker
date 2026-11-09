@@ -3,7 +3,7 @@
 import os
 from collections.abc import AsyncIterator, Generator
 from contextlib import asynccontextmanager
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
@@ -36,7 +36,7 @@ def _mock_rt_response(status: int = 200, message: str = "Ok", body: str = "") ->
 async def _patch_rt_client(
     response: httpx.Response | None = None,
     side_effect: list[httpx.Response] | None = None,
-) -> AsyncIterator[AsyncMock]:
+) -> AsyncIterator[MagicMock]:
     """Patch the client to answer with mock RT responses.
 
     The client streams now: `build_request` then `send(..., stream=True)`. Only
