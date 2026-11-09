@@ -6,7 +6,11 @@ All credentials are handled via the Config class using SecretStr.
 
 import logging
 import re
+from base64 import b64encode
+from html import unescape
+from importlib.metadata import version
 from typing import Any
+from urllib.parse import unquote_plus
 
 import httpx
 
@@ -14,6 +18,49 @@ from .config import Config
 from .errors import RTApiError
 
 logger = logging.getLogger(__name__)
+
+# An RT ticket history with attachments is the biggest body here.
+MAX_RESPONSE_SIZE = 10 * 1024 * 1024
+BODY_SNIPPET_CHARS = 200
+ELLIPSIS = "..."
+
+# How many times an error body is percent-decoded while looking for an echoed
+# credential. A proxy debug page that shows the form it received decodes once;
+# one that shows that page inside another form decodes twice.
+DECODE_ROUNDS = 3
+WITHHELD = "<body withheld: it echoed a credential>"
+
+# Identify this client by name. httpx otherwise sends `python-httpx/<version>`,
+# which bot protection answers with an HTML challenge page instead of the API --
+# the failure that cost an afternoon on mcp-wordpress (RT #1596). The version
+# comes from installed package metadata so it cannot drift from pyproject.toml.
+USER_AGENT = (
+    f"mcp-request-tracker-crunchtools/{version('mcp-request-tracker-crunchtools')} "
+    "(+https://github.com/crunchtools/mcp-request-tracker)"
+)
+
+
+def _snippet(text: str, truncated: bool = False) -> str:
+    """A short, single-line excerpt of some text, for an error message."""
+    collapsed = " ".join(text.split())
+    if not collapsed:
+        return "<empty body>"
+    if len(collapsed) > BODY_SNIPPET_CHARS or truncated:
+        return collapsed[: BODY_SNIPPET_CHARS - len(ELLIPSIS)] + ELLIPSIS
+    return collapsed
+
+
+def _where(response: httpx.Response) -> str:
+    """Which request a response answered, for an error message.
+
+    The URL actually requested, which matters here because this client follows
+    redirects: an RT behind Cloudflare Access answers from somewhere else
+    entirely, and that is the case `raise_for_status()` could not describe.
+    """
+    return (
+        f"{response.request.method} {response.request.url} "
+        f"(HTTP {response.status_code}, {response.headers.get('content-type', 'no content-type')})"
+    )
 
 
 class RTClient:
@@ -43,6 +90,7 @@ class RTClient:
                 auth=auth,
                 timeout=30.0,
                 follow_redirects=True,
+                headers={"User-Agent": USER_AGENT},
             )
         return self._client
 
@@ -63,7 +111,9 @@ class RTClient:
             Response text from RT.
 
         Raises:
-            httpx.HTTPError: On HTTP errors.
+            RTApiError: On a transport failure, an oversized body, or an
+                unsuccessful status -- naming the request in each case, since
+                `raise_for_status()` could not say which URL answered.
         """
         client = await self._get_client()
         url = f"{self._config.api_base_url}/{endpoint}"
@@ -83,9 +133,110 @@ class RTClient:
                 url = url + "?" + "&".join(query_parts)
 
         logger.debug("Making request to %s", endpoint)
-        response = await client.post(url, data=form_data)
-        response.raise_for_status()
-        return response.text
+        request = client.build_request("POST", url, data=form_data)
+        try:
+            response = await client.send(request, stream=True)
+            try:
+                body = await self._read_capped(response)
+            finally:
+                await response.aclose()
+        # The URL is named here too, not only on an HTTP status: httpx's own
+        # exception message does not reliably carry it, and a timeout with no
+        # endpoint in it is the hardest failure of the three to place.
+        except httpx.TimeoutException as e:
+            raise RTApiError(0, f"Request timeout: POST {url}: {e}") from e
+        except httpx.RequestError as e:
+            raise RTApiError(0, f"Request failed: POST {url}: {e}") from e
+
+        if not response.is_success:
+            raise RTApiError(
+                response.status_code,
+                f"{_where(response)} returned {self._safe_snippet(body)}",
+            )
+        return body.decode("utf-8", errors="replace")
+
+    def _secrets(self) -> list[str]:
+        """Every value in a body that would be one of this client's credentials.
+
+        A body can echo a credential through two channels, not one: the RT
+        form (`pass=`) and the HTTP Basic header, which is base64 of
+        `user:pass` rather than the password itself.
+        """
+        secrets = [s for s in (self._config.password, self._config.http_password) if s]
+        if self._config.http_user and self._config.http_password:
+            pair = f"{self._config.http_user}:{self._config.http_password}"
+            secrets.append(b64encode(pair.encode()).decode())
+        return secrets
+
+    def _safe_snippet(self, body: bytes) -> str:
+        """A body excerpt with this client's own credentials taken out.
+
+        RT REST 1.0 takes `user` and `pass` in the POST body, so a page that
+        echoes the request back -- a proxy debug page, an SSO interstitial --
+        reflects the password. `RTApiError` does not scrub, unlike some of the
+        other servers in the fleet, so it is done here, where the body is first
+        turned into a message (Layer 1).
+
+        The echoed body is FORM-ENCODED and arrives inside an HTML page, so
+        the password comes back percent-encoded, HTML-escaped, or both, and a
+        raw replace walks past all of it. Listing the spellings (`quote`,
+        `quote_plus`) was the first version of this and it was wrong: lowercase
+        hex, an over-escaped unreserved character, `&amp;` for `&` and a doubly
+        encoded page are all valid and none of them are on such a list. So each
+        round normalises instead -- percent-decode, then HTML-unescape -- which
+        covers every spelling of a character at once, and the replace pass runs
+        again after each round.
+
+        Redaction happens BEFORE the snippet is cut; truncating first leaves
+        the tail of a password that straddles the boundary.
+
+        Two conditions withhold the body entirely: a credential still present
+        at the end, and a body that was STILL unwrapping an encoding layer when
+        the rounds ran out. The second matters as much as the first, because a
+        password one `unquote` short of readable is a password. The snippet is
+        a convenience; the credential staying out of the transcript is not.
+        """
+        secrets = self._secrets()
+        text = body.decode("utf-8", errors="replace")
+        settled = False
+        for _ in range(DECODE_ROUNDS):
+            for secret in secrets:
+                text = text.replace(secret, "***")
+            decoded = unescape(unquote_plus(text))
+            if decoded == text:
+                settled = True
+                break
+            text = decoded
+        for secret in secrets:
+            text = text.replace(secret, "***")
+        if not settled or any(secret in text for secret in secrets):
+            return WITHHELD
+        return _snippet(text)
+
+    async def _read_capped(self, response: httpx.Response) -> bytes:
+        """Read the body, aborting as soon as it would pass MAX_RESPONSE_SIZE.
+
+        There was no limit here at all: a ticket history with attachments, or
+        anything else answering on that URL, was read whole into the process.
+        Measured before each chunk is copied in, because `aiter_bytes()`
+        promises nothing about chunk size.
+        """
+        declared = response.headers.get("content-length")
+        if declared and declared.isdigit() and int(declared) > MAX_RESPONSE_SIZE:
+            raise RTApiError(
+                response.status_code,
+                f"{_where(response)} declared {declared} bytes, over the "
+                f"{MAX_RESPONSE_SIZE} byte limit",
+            )
+        body = bytearray()
+        async for chunk in response.aiter_bytes():
+            if len(body) + len(chunk) > MAX_RESPONSE_SIZE:
+                raise RTApiError(
+                    response.status_code,
+                    f"{_where(response)} sent over the {MAX_RESPONSE_SIZE} byte limit",
+                )
+            body += chunk
+        return bytes(body)
 
     def _parse_response(self, text: str) -> tuple[int, str, str]:
         """Parse RT response into status code, message, and body."""

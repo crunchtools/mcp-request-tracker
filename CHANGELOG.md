@@ -8,6 +8,54 @@ Entries prior to 2026-09-19 are back-filled from GitHub Release notes (RT #1484)
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-09
+
+### Security
+
+- **A body quoted back in an error has the password taken out of it.** RT REST
+  1.0 authenticates with `user` and `pass` in the POST body, so a page that
+  echoes the request back — a proxy debug page, an SSO interstitial — reflects
+  the credential. This matters now because errors quote bodies, which they did
+  not before; and `RTApiError` does not scrub, unlike some of the fleet's error
+  types, so the redaction happens where the body becomes a message.
+
+  The redaction does not work from a list of spellings. Replacing the password
+  and two canonical percent-encodings of it was the first version and it was
+  wrong: lowercase hex, an over-escaped unreserved character, `&amp;` for `&`
+  in the HTML the page is made of, and a doubly encoded page are all valid and
+  none of them are on such a list — and the HTTP Basic header carries the
+  password as base64 rather than as itself. Each round normalises instead,
+  percent-decoding and then HTML-unescaping, and the base64 of
+  `RT_HTTP_USER:RT_HTTP_PASS` is redacted alongside both passwords.
+  If a credential is still present at the end, or the body was still unwrapping
+  an encoding layer when the decoder gave up, no body goes into the message at
+  all — a password one `unquote` short of readable is a password.
+
+### Fixed
+
+- **A response had no size limit at all.** A ticket history with attachments,
+  or anything else answering on that URL, was read whole into the process.
+  Bodies are now read in bounded pieces under a 10MB cap, measured before each
+  chunk is copied in.
+
+- **An error says which site answered, and with what.** It was
+  `response.raise_for_status()`, which raises httpx's own exception naming
+  neither the URL nor the body. This client follows redirects, so an RT behind
+  Cloudflare Access answers from somewhere else entirely — the case that error
+  could not describe. Failures now name the method, the full requested URL, the
+  status, the content-type and a bounded body snippet, as an `RTApiError`.
+
+### Added
+
+- **The client says what it is.** Requests carry
+  `User-Agent: mcp-request-tracker-crunchtools/<version> (+<repo url>)`, with
+  the version read from installed package metadata.
+
+### Changed
+
+- Inherits constitution v1.36.0, whose MCP Server profile 1.8.0 states the
+  outbound HTTP contract (RT #1601).
+
 ## [0.7.1] - 2026-10-31
 
 ### Security

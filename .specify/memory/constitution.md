@@ -2,9 +2,9 @@
 
 > **Version:** 1.1.0
 > **Ratified:** 2026-03-02
-> **Amended:** 2026-10-02
+> **Amended:** 2026-11-09
 > **Status:** Active
-> **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.31.0
+> **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.36.0
 > **Profile:** MCP Server
 
 This file holds what is specific to mcp-request-tracker. The fleet rules and
@@ -23,8 +23,10 @@ inherited version and are checked against this repo's files by
 - **Input limits:** ticket IDs are integers; priority is enforced to 0-99;
   queries and content are sanitized strings.
 - **API:** RT REST 1.0. Authentication is a form-data POST, not a Bearer
-  header. TLS certificates are always validated; requests time out after
-  30s.
+  header -- which is why a body quoted back in an error has the configured
+  password taken out of it before the message is built. TLS certificates are
+  always validated; requests time out after 30s; every request carries an
+  identifying User-Agent; and a response is capped at 10MB while reading.
 - **Surface:** the configured RT instance only, no filesystem access, shell
   execution or code evaluation.
 
