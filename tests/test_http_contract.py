@@ -6,11 +6,13 @@ the client adds and the ceiling is enforced while the client reads, so the
 """
 
 import os
+from base64 import b64encode
 from collections.abc import AsyncIterator, Callable, Iterator
 from contextlib import contextmanager
 from importlib.metadata import version
 from typing import Any
 from unittest.mock import patch
+from urllib.parse import quote
 
 import httpx
 import pytest
@@ -25,6 +27,11 @@ Handler = Callable[[httpx.Request], httpx.Response]
 RT_PASS = "s3cret & rt=password"  # gatehouse: allow-secret
 
 
+def _ok(_request: httpx.Request) -> httpx.Response:
+    """A reply for the tests that exercise a helper rather than a request."""
+    return httpx.Response(200, text="RT/5.0.0 200 Ok\n\n")
+
+
 async def _chunks(chunk: bytes, times: int) -> AsyncIterator[bytes]:
     """A chunked body, which carries no content-length -- what a header check misses."""
     for _ in range(times):
@@ -32,9 +39,12 @@ async def _chunks(chunk: bytes, times: int) -> AsyncIterator[bytes]:
 
 
 @contextmanager
-def _serving(handler: Handler) -> Iterator[client_mod.RTClient]:
+def _serving(
+    handler: Handler, extra_env: dict[str, str] | None = None
+) -> Iterator[client_mod.RTClient]:
     """Hand back a client whose own `_get_client` rides a mock transport."""
     env = {"RT_URL": "https://rt.example.com", "RT_USER": "test_user", "RT_PASS": RT_PASS}
+    env.update(extra_env or {})
     real = httpx.AsyncClient
 
     def factory(**kwargs: Any) -> httpx.AsyncClient:
@@ -285,13 +295,81 @@ class TestDeclaredLength:
         assert text.startswith("RT/5.0.0 200 Ok")
 
     def test_an_empty_body_says_so(self) -> None:
-        assert client_mod._body_snippet(b"") == "<empty body>"
+        with _serving(_ok) as rt:
+            assert rt._safe_snippet(b"") == "<empty body>"
 
     def test_a_long_body_is_cut_to_the_cap_including_the_ellipsis(self) -> None:
-        snippet = client_mod._body_snippet(b"y" * 100_000)
+        with _serving(_ok) as rt:
+            snippet = rt._safe_snippet(b"y" * 100_000)
 
         assert len(snippet) == client_mod.BODY_SNIPPET_CHARS
         assert snippet.endswith("...")
 
     def test_a_short_body_is_quoted_whole_and_collapsed(self) -> None:
-        assert client_mod._body_snippet(b"RT/5.0.0 404\n  Not found") == "RT/5.0.0 404 Not found"
+        with _serving(_ok) as rt:
+            assert rt._safe_snippet(b"RT/5.0.0 404\n  Not found") == "RT/5.0.0 404 Not found"
+
+
+class TestRedactionDoesNotRelyOnASpellingList:
+    """Every encoding of the same password, not the three a list thought of.
+
+    Listing `quote` and `quote_plus` was the first version of this and it was
+    wrong: percent-encoding has more than one valid spelling per character, and
+    the HTTP Basic header carries the password as base64 rather than as itself.
+    So nothing here is a spelling the production code enumerates.
+    """
+
+    def test_lowercase_hex_is_redacted(self) -> None:
+        """`quote` emits `%26`; a server is equally entitled to emit `%26` as `%26`."""
+        echoed = "pass=" + RT_PASS.replace(" ", "%20").replace("&", "%26").lower()
+
+        with _serving(_ok) as rt:
+            snippet = rt._safe_snippet(echoed.encode())
+
+        assert "s3cret" not in snippet
+        assert "password" not in snippet
+
+    def test_an_over_escaped_unreserved_character_is_redacted(self) -> None:
+        """`s` encoded as `%73` is legal and is on no list of spellings."""
+        echoed = "pass=" + "".join(f"%{ord(c):02X}" for c in RT_PASS)
+
+        with _serving(_ok) as rt:
+            snippet = rt._safe_snippet(echoed.encode())
+
+        assert "s3cret" not in snippet
+
+    def test_a_doubly_encoded_echo_is_redacted(self) -> None:
+        """A debug page showing a form that itself quoted the form it received."""
+        once = "".join(f"%{ord(c):02X}" for c in RT_PASS)
+        twice = once.replace("%", "%25")
+
+        with _serving(_ok) as rt:
+            snippet = rt._safe_snippet(twice.encode())
+
+        assert "s3cret" not in snippet
+
+    def test_the_basic_auth_header_is_redacted(self) -> None:
+        """An echoed `Authorization` header carries base64, not the password."""
+        env = {"RT_HTTP_USER": "proxy_user", "RT_HTTP_PASS": "proxy-secret"}
+        encoded = b64encode(b"proxy_user:proxy-secret").decode()
+
+        with _serving(_ok, extra_env=env) as rt:
+            snippet = rt._safe_snippet(f"Authorization: Basic {encoded}".encode())
+
+        assert encoded not in snippet
+        assert "proxy-secret" not in snippet
+
+    def test_a_credential_that_survives_withholds_the_whole_body(self) -> None:
+        """The backstop: a snippet is a convenience, the redaction is not.
+
+        Nested deeper than the decoder unwinds, so the password is still in the
+        text when the rounds run out. No body goes into the message at all.
+        """
+        text = RT_PASS
+        for _ in range(client_mod.DECODE_ROUNDS + 1):
+            text = quote(text, safe="")
+
+        with _serving(_ok) as rt:
+            snippet = rt._safe_snippet(text.encode())
+
+        assert snippet == client_mod.WITHHELD

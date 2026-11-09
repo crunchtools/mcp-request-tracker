@@ -6,9 +6,10 @@ All credentials are handled via the Config class using SecretStr.
 
 import logging
 import re
+from base64 import b64encode
 from importlib.metadata import version
 from typing import Any
-from urllib.parse import quote, quote_plus
+from urllib.parse import unquote_plus
 
 import httpx
 
@@ -21,6 +22,12 @@ logger = logging.getLogger(__name__)
 MAX_RESPONSE_SIZE = 10 * 1024 * 1024
 BODY_SNIPPET_CHARS = 200
 ELLIPSIS = "..."
+
+# How many times an error body is percent-decoded while looking for an echoed
+# credential. A proxy debug page that shows the form it received decodes once;
+# one that shows that page inside another form decodes twice.
+DECODE_ROUNDS = 3
+WITHHELD = "<body withheld: it echoed a credential>"
 
 # Identify this client by name. httpx otherwise sends `python-httpx/<version>`,
 # which bot protection answers with an HTML challenge page instead of the API --
@@ -40,12 +47,6 @@ def _snippet(text: str, truncated: bool = False) -> str:
     if len(collapsed) > BODY_SNIPPET_CHARS or truncated:
         return collapsed[: BODY_SNIPPET_CHARS - len(ELLIPSIS)] + ELLIPSIS
     return collapsed
-
-
-def _body_snippet(body: bytes) -> str:
-    """A short, single-line excerpt of a response body, for an error message."""
-    prefix = body[: BODY_SNIPPET_CHARS * 4]
-    return _snippet(prefix.decode("utf-8", errors="replace"), truncated=len(body) > len(prefix))
 
 
 def _where(response: httpx.Response) -> str:
@@ -153,6 +154,19 @@ class RTClient:
             )
         return body.decode("utf-8", errors="replace")
 
+    def _secrets(self) -> list[str]:
+        """Every value in a body that would be one of this client's credentials.
+
+        A body can echo a credential through two channels, not one: the RT
+        form (`pass=`) and the HTTP Basic header, which is base64 of
+        `user:pass` rather than the password itself.
+        """
+        secrets = [s for s in (self._config.password, self._config.http_password) if s]
+        if self._config.http_user and self._config.http_password:
+            pair = f"{self._config.http_user}:{self._config.http_password}"
+            secrets.append(b64encode(pair.encode()).decode())
+        return secrets
+
     def _safe_snippet(self, body: bytes) -> str:
         """A body excerpt with this client's own credentials taken out.
 
@@ -162,27 +176,38 @@ class RTClient:
         other servers in the fleet, so it is done here, where the body is first
         turned into a message (Layer 1).
 
-        Two things this has to get right, both of which a redact-then-truncate
-        or raw-string-only version gets wrong:
+        The echoed body is FORM-ENCODED, so the password comes back
+        percent-encoded and a raw replace walks past it. Listing the spellings
+        (`quote`, `quote_plus`) was the first version of this and it was wrong:
+        lowercase hex, an over-escaped unreserved character and a doubly
+        encoded page are all valid and none of them are on such a list. So the
+        body is decoded instead, which normalises every spelling at once, and
+        the pass runs again after each round.
 
-        * The echoed body is FORM-ENCODED, so a password with a reserved
-          character in it comes back percent-encoded -- `a&b` as `a%26b`, a
-          space as `+` or `%20` -- and a raw replace would walk straight past
-          it. Every encoding of the secret is replaced, not just the one that
-          was configured.
-        * The redaction happens BEFORE the snippet is cut. Truncating first
-          leaves the tail of a password that straddles the boundary.
+        Redaction happens BEFORE the snippet is cut; truncating first leaves
+        the tail of a password that straddles the boundary.
 
-        The whole body is decoded for this, which is why it is only on the
-        error path: the body is already bounded, and a partially redacted
-        credential is worse than the work.
+        Two conditions withhold the body entirely: a credential still present
+        at the end, and a body that was STILL unwrapping an encoding layer when
+        the rounds ran out. The second matters as much as the first, because a
+        password one `unquote` short of readable is a password. The snippet is
+        a convenience; the credential staying out of the transcript is not.
         """
+        secrets = self._secrets()
         text = body.decode("utf-8", errors="replace")
-        for secret in (self._config.password, self._config.http_password):
-            if not secret:
-                continue
-            for encoded in {secret, quote(secret, safe=""), quote_plus(secret)}:
-                text = text.replace(encoded, "***")
+        settled = False
+        for _ in range(DECODE_ROUNDS):
+            for secret in secrets:
+                text = text.replace(secret, "***")
+            decoded = unquote_plus(text)
+            if decoded == text:
+                settled = True
+                break
+            text = decoded
+        for secret in secrets:
+            text = text.replace(secret, "***")
+        if not settled or any(secret in text for secret in secrets):
+            return WITHHELD
         return _snippet(text)
 
     async def _read_capped(self, response: httpx.Response) -> bytes:

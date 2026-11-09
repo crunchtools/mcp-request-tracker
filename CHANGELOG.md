@@ -19,6 +19,17 @@ Entries prior to 2026-09-19 are back-filled from GitHub Release notes (RT #1484)
   not before; and `RTApiError` does not scrub, unlike some of the fleet's error
   types, so the redaction happens where the body becomes a message.
 
+  The redaction does not work from a list of spellings. Replacing the password
+  and two canonical percent-encodings of it was the first version and it was
+  wrong: lowercase hex, an over-escaped unreserved character and a doubly
+  encoded page are all valid and none of them are on such a list, and the HTTP
+  Basic header carries the password as base64 rather than as itself. The body
+  is percent-decoded instead, which normalises every spelling at once, and the
+  base64 of `RT_HTTP_USER:RT_HTTP_PASS` is redacted alongside both passwords.
+  If a credential is still present at the end, or the body was still unwrapping
+  an encoding layer when the decoder gave up, no body goes into the message at
+  all — a password one `unquote` short of readable is a password.
+
 ### Fixed
 
 - **A response had no size limit at all.** A ticket history with attachments,
