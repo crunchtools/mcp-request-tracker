@@ -7,6 +7,7 @@ All credentials are handled via the Config class using SecretStr.
 import logging
 import re
 from base64 import b64encode
+from html import unescape
 from importlib.metadata import version
 from typing import Any
 from urllib.parse import unquote_plus
@@ -176,13 +177,15 @@ class RTClient:
         other servers in the fleet, so it is done here, where the body is first
         turned into a message (Layer 1).
 
-        The echoed body is FORM-ENCODED, so the password comes back
-        percent-encoded and a raw replace walks past it. Listing the spellings
-        (`quote`, `quote_plus`) was the first version of this and it was wrong:
-        lowercase hex, an over-escaped unreserved character and a doubly
-        encoded page are all valid and none of them are on such a list. So the
-        body is decoded instead, which normalises every spelling at once, and
-        the pass runs again after each round.
+        The echoed body is FORM-ENCODED and arrives inside an HTML page, so
+        the password comes back percent-encoded, HTML-escaped, or both, and a
+        raw replace walks past all of it. Listing the spellings (`quote`,
+        `quote_plus`) was the first version of this and it was wrong: lowercase
+        hex, an over-escaped unreserved character, `&amp;` for `&` and a doubly
+        encoded page are all valid and none of them are on such a list. So each
+        round normalises instead -- percent-decode, then HTML-unescape -- which
+        covers every spelling of a character at once, and the replace pass runs
+        again after each round.
 
         Redaction happens BEFORE the snippet is cut; truncating first leaves
         the tail of a password that straddles the boundary.
@@ -199,7 +202,7 @@ class RTClient:
         for _ in range(DECODE_ROUNDS):
             for secret in secrets:
                 text = text.replace(secret, "***")
-            decoded = unquote_plus(text)
+            decoded = unescape(unquote_plus(text))
             if decoded == text:
                 settled = True
                 break

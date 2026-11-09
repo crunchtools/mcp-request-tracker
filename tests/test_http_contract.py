@@ -9,10 +9,11 @@ import os
 from base64 import b64encode
 from collections.abc import AsyncIterator, Callable, Iterator
 from contextlib import contextmanager
+from html import escape
 from importlib.metadata import version
 from typing import Any
 from unittest.mock import patch
-from urllib.parse import quote
+from urllib.parse import quote, quote_plus
 
 import httpx
 import pytest
@@ -268,6 +269,35 @@ class TestRedactionSurvivesEncodingAndTruncation:
             assert fragment not in message
 
 
+class TestTheCapBoundaryItself:
+    """A body of exactly the cap is within it; the check is `>`, not `>=`."""
+
+    @pytest.mark.asyncio
+    async def test_a_body_exactly_at_the_cap_is_accepted(self) -> None:
+        exact = b"x" * client_mod.MAX_RESPONSE_SIZE
+
+        def handler(_request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, headers={"content-type": "text/plain"}, content=exact)
+
+        with _serving(handler) as rt:
+            text = await rt._request("ticket/1/show")
+
+        assert len(text) == client_mod.MAX_RESPONSE_SIZE
+
+    @pytest.mark.asyncio
+    async def test_one_byte_over_the_cap_is_refused(self) -> None:
+        """The pair that makes the boundary a claim rather than a coincidence."""
+        over = b"x" * (client_mod.MAX_RESPONSE_SIZE + 1)
+
+        def handler(_request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, headers={"content-type": "text/plain"}, content=over)
+
+        with _serving(handler) as rt, pytest.raises(RTApiError) as caught:
+            await rt._request("ticket/1/show")
+
+        assert "byte limit" in str(caught.value)
+
+
 class TestDeclaredLength:
     """The header is an early reject, and the snippet has three branches."""
 
@@ -361,6 +391,27 @@ class TestRedactionDoesNotRelyOnASpellingList:
 
         assert encoded not in snippet
         assert "proxy-secret" not in snippet
+
+    def test_an_html_escaped_echo_is_redacted(self) -> None:
+        """An RT error page is HTML, so an echoed `&` comes back as `&amp;`."""
+        echoed = "<pre>pass=" + escape(RT_PASS) + "</pre>"
+
+        with _serving(_ok) as rt:
+            snippet = rt._safe_snippet(echoed.encode())
+
+        # The escape really happened, so the test is testing what it claims.
+        assert "&amp;" in escape(RT_PASS)
+        assert "s3cret" not in snippet
+        assert "password" not in snippet
+
+    def test_a_form_encoded_echo_inside_an_html_page_is_redacted(self) -> None:
+        """Both at once: the form value percent-encoded, then HTML-escaped."""
+        echoed = "<pre>" + escape(quote_plus(RT_PASS)) + "</pre>"
+
+        with _serving(_ok) as rt:
+            snippet = rt._safe_snippet(echoed.encode())
+
+        assert "s3cret" not in snippet
 
     def test_a_credential_that_survives_withholds_the_whole_body(self) -> None:
         """The backstop: a snippet is a convenience, the redaction is not.
