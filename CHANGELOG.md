@@ -8,6 +8,19 @@ Entries prior to 2026-09-19 are back-filled from GitHub Release notes (RT #1484)
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-11-10
+
+### Fixed
+
+- **The container now installs the committed, Dependabot-maintained `uv.lock`
+  instead of letting pip resolve dependencies fresh.** The builder stage did
+  `pip install .`, which reads only `pyproject.toml`'s floor-pins and lets pip
+  pick whatever satisfies them at build time -- versions no test ever ran
+  against. A new `lock` stage exports `uv.lock` to a frozen requirements list
+  with `uv export --frozen`, and the builder installs that list with
+  `--no-deps` before installing the project, also with `--no-deps`, so pip
+  cannot re-resolve anything. Part of RT#1564.
+
 ## [0.8.0] - 2026-11-09
 
 ### Security
