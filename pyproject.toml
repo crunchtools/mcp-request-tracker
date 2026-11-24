@@ -92,4 +92,12 @@ skip = ["semgrep"]
 env = { RT_URL = "https://rt.example.com", RT_USER = "test_user", RT_PASS = "test_pass" }
 
 [tool.sdlc]
+# Written by crunchtools/sdlc's scripts/convert_repo.py: moved from the workflows.
+publish = "pypi"
 repo-kinds = ["mcp-server"]
+
+[tool.sdlc.image]
+# Written by crunchtools/sdlc's scripts/convert_repo.py: moved from the workflows.
+image = "quay.io/crunchtools/mcp-request-tracker"
+boot = "mcp"
+boot-env = "RT_URL=https://rt.invalid\nRT_USER=gate-dummy\nRT_PASS=gate-dummy\n"
