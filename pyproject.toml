@@ -91,3 +91,5 @@ skip = ["semgrep"]
 [tool.sdlc.push.pytest]
 env = { RT_URL = "https://rt.example.com", RT_USER = "test_user", RT_PASS = "test_pass" }
 
+[tool.sdlc]
+repo-kinds = ["mcp-server"]
